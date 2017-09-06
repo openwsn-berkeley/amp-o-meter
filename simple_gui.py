@@ -1,4 +1,4 @@
-from time import time, sleep
+from time import time, sleep, strftime, localtime
 import RPi.GPIO as GPIO
 from tkinter import *
 from tkinter import ttk
@@ -19,18 +19,28 @@ class Counter():
         self.accumulated_charge = 0
         self.avg_current = 0
         self.start = time()
+        self.create_history_file()
+
+    def create_history_file(self):
+        self.file_name = "history/history_{}.csv".format(strftime('%Y-%m-%d %H:%M:%S', localtime(time())).replace(' ', '_'))
+        with open(self.file_name, 'a') as file:
+            file.write('time_absolute,time_relative,direction\n')
 
     def add_tick(self, instant, direction):
         tick = Tick(instant, direction)
         self.ticks.append(tick)
         self.accumulated_charge += tick.CHARGE * tick.direction
         self.avg_current = self.accumulated_charge/(time()-self.start)
+        
+        with open(self.file_name, 'a') as file:
+            file.write('{},{},{}\n'.format(time(), time()-self.start, direction))
 
     def reset(self):
         self.ticks = []
         self.accumulated_charge = 0
         self.avg_current = 0
         self.start = time()
+        self.create_history_file()
 
 class Gui():
     def __init__(self):
@@ -41,6 +51,7 @@ class Gui():
         self.number_of_ticks = StringVar()
         self.total_charge = StringVar()
         self.avg_current = StringVar()
+        self.file_name = StringVar()
 
         self.root.title("AMP-O-METER")
 
@@ -53,11 +64,13 @@ class Gui():
         ttk.Label(self.mainframe, textvariable=self.number_of_ticks).grid(column=2, row=2, sticky=(W, E))
         ttk.Label(self.mainframe, textvariable=self.total_charge).grid(column=3, row=2, sticky=(W, E))
         ttk.Label(self.mainframe, textvariable=self.avg_current).grid(column=4, row=2, sticky=(W, E))
+        ttk.Label(self.mainframe, textvariable=self.file_name).grid(columnspan=2, column=2, row=3, sticky=(W, E))
 
         ttk.Label(self.mainframe, text="Time elapsed:").grid(column=1, row=1, sticky=W)
         ttk.Label(self.mainframe, text="Total ticks:").grid(column=2, row=1, sticky=W)
         ttk.Label(self.mainframe, text="Total charge (mC):").grid(column=3, row=1, sticky=W)
         ttk.Label(self.mainframe, text="Avg courrent (mA):").grid(column=4, row=1, sticky=W)
+        ttk.Label(self.mainframe, text="History file:").grid(column=1, row=3, sticky=W)
 
         # self.recharge_button = ttk.Button(self.mainframe, text="Recharge tick").grid(column=1, row=3, sticky=W)
         self.discharge_button = ttk.Button(self.mainframe, text="Reset")
@@ -85,8 +98,8 @@ class Controller():
         # self.gui.recharge_button.bind("<Button>", self.add_tick)
         self.gui.discharge_button.bind("<Button>", self.reset)
 
-        with open('history.csv', 'a') as file:
-            file.write('time_absolute,time_relative,direction\n')
+        self.update_gui()
+
 
 
     def reset(self, *args):
@@ -98,18 +111,17 @@ class Controller():
         self.gui.run()
 
 
-    def add_tick(self, directon=Tick.DISCHARGING):
+    def add_tick(self, direction=Tick.DISCHARGING):
         instant = time()
-        self.counter.add_tick(instant, directon)
+        self.counter.add_tick(instant, direction)
         self.update_gui()
-        
-        with open('history.csv', 'a') as file:
-            file.write('{},{},{}\n'.format(time(), time()-self.counter.start, directon))
+
 
     def update_gui(self):
         self.gui.number_of_ticks.set(len(self.counter.ticks))
         self.gui.total_charge.set("{:8.5f}".format(self.counter.accumulated_charge))
         self.gui.avg_current.set("{:5.3f}".format(self.counter.avg_current))
+        self.gui.file_name.set(self.counter.file_name)
 
         # TODO: add history list
 
