@@ -3,6 +3,7 @@ import RPi.GPIO as GPIO
 from tkinter import *
 from tkinter import ttk
 from threading import Thread
+import os
 
 class Tick():
     CHARGE = 614.439
@@ -22,6 +23,9 @@ class Counter():
         self.create_history_file()
 
     def create_history_file(self):
+        if not os.path.exists('history'):
+            os.makedirs('history')
+
         self.file_name = "history/history_{}.csv".format(strftime('%Y-%m-%d %H:%M:%S', localtime(time())).replace(' ', '_'))
         with open(self.file_name, 'w') as file:
             file.write('time_absolute,time_relative,direction\n')
