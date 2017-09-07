@@ -23,7 +23,7 @@ class Counter():
 
     def create_history_file(self):
         self.file_name = "history/history_{}.csv".format(strftime('%Y-%m-%d %H:%M:%S', localtime(time())).replace(' ', '_'))
-        with open(self.file_name, 'a') as file:
+        with open(self.file_name, 'w') as file:
             file.write('time_absolute,time_relative,direction\n')
 
     def add_tick(self, instant, direction):
@@ -73,14 +73,17 @@ class Gui():
         ttk.Label(self.mainframe, text="History file:").grid(column=1, row=3, sticky=W)
 
         # self.recharge_button = ttk.Button(self.mainframe, text="Recharge tick").grid(column=1, row=3, sticky=W)
-        self.discharge_button = ttk.Button(self.mainframe, text="Reset")
-        self.discharge_button.grid(column=4, row=3, sticky=W)
+        self.reset_button = ttk.Button(self.mainframe, text="Reset")
+        self.reset_button.grid(column=4, row=3, sticky=W)
 
         for child in self.mainframe.winfo_children():
             child.grid_configure(padx=5, pady=5)
 
     def run(self):
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        finally:
+            GPIO.cleanup()
 
 
 class Controller():
@@ -96,15 +99,19 @@ class Controller():
         self.update_time_thread.start()
 
         # self.gui.recharge_button.bind("<Button>", self.add_tick)
-        self.gui.discharge_button.bind("<Button>", self.reset)
+        self.gui.reset_button.bind("<Button>", self.reset)
 
-        self.update_gui()
+        self.gui.file_name.set("Waiting for first tick...")
+        self.did_tick = False
 
 
 
     def reset(self, *args):
         self.counter.reset()
-        self.update_gui()
+        self.gui.file_name.set("Waiting for first tick...")
+        self.gui.number_of_ticks.set("")
+        self.gui.total_charge.set("")
+        self.gui.avg_current.set("")
 
     def run(self):
         self.setup_probe()
@@ -112,9 +119,14 @@ class Controller():
 
 
     def add_tick(self, direction=Tick.DISCHARGING):
-        instant = time()
-        self.counter.add_tick(instant, direction)
-        self.update_gui()
+        if not self.did_tick:
+            self.counter.start = time()
+            self.update_gui()
+            self.did_tick = True
+        else:
+            instant = time()
+            self.counter.add_tick(instant, direction)
+            self.update_gui()
 
 
     def update_gui(self):
