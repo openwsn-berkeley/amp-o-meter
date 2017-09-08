@@ -36,6 +36,11 @@ Following the BCM numbering scheme those 4 pins are:
 
 The power source can be either the RPi's 3.3V pin or an external source from 3.3V to 9V. No more than 1A should pass the circuit.
 
+![Alt text](/../images/img/img1.JPG?raw=true "Optional Title")
+![Alt text](/../images/img/img2.JPG?raw=true "Optional Title")
+![Alt text](/../images/img/img3.JPG?raw=true "Optional Title")
+
+
 ### 4. Raspbian setup + screen drivers
 
 The first step is to flash the Raspbian image to the microSD card. As there are plenty of tutorials available on the internet this step won't be covered here.
@@ -78,6 +83,8 @@ The final step is to run the code. There are two ways of doing this, either from
 
 For debugging and further analysis purposes a _csv_ file can be created with an absolute timestamp, a timestamp relative to the beginning and the direction of change (1 for charging and -1 for discharging) for each detected tick. This option is disables by default and can be enabled with the flag `--csv`. 
 
+That's it! Your final setup should look like this:
+![Alt text](/../images/img/img4.JPG?raw=true "Optional Title")
 
 
 ## Dependencies
