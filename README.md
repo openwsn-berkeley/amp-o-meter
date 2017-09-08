@@ -1,6 +1,6 @@
 ## AMP-O-METER
 
-A script to measure the power consumed by any circuit with the use of a LTC4150 Coulomb Meter attached to a Raspberry Pi. It works by counting the number of times the interrupt pin went down on the LTC4150 module and multiplying it by the equivalent charge (in the default case 614.439 mC). Due to the coulomb counter design it measures the power consumption of the load and of itself (which ranges from 100 to 350 uA).
+A script to measure the power consumed by any circuit with the use of a LTC4150 Coulomb Meter attached to a Raspberry Pi. It works by counting the number of times the interrupt pin goes down on the LTC4150 module and multiplying it by the equivalent charge (in the default case 614.439 mC). Due to the coulomb counter design it measures the power consumption of the load and of itself (which ranges from 100 to 350 uA).
 
 The steps needed to reproduce the counter are below.
 
@@ -9,30 +9,41 @@ The steps needed to reproduce the counter are below.
 
 Here is the list of the hardware used for the original meter. Some components can be changed for similar ones such as the screen without affecting how the script works, others however (notably the coulomb counter) can't be changed.
 
-- Raspberry Pi 3 (with 16GB microSD card and micro usb power supply)
-- Kuman 3.5 inch display (with resolution of 480x320, capacitive touch and **XPT2046 touch controller**)
-- LTC4150 Coulomb Counter (with breakout board from SparkFun)
-- 2 jumper cables, 2 hooks and 4-pin female header
+- Raspberry Pi 3 (with 16GB microSD card and micro usb power supply) (USD 55.00 [here][7])
+- Kuman 3.5 inch display (with resolution of 480x320, capacitive touch and **XPT2046 touch controller**) (USD 28.00 [here][3])
+- LTC4150 Coulomb Counter (with breakout board from SparkFun) (USD 12.95 [here][5])
+- 2 jumper cables, 2 hooks (USd 8.95 [here][6]) and 4-pin female header
+
+
+[3]: http://www.kumantech.com/kuman-35quot-320480-tft-lcd-display-with-case-for-raspberry-pi-pi-2-pi-3-model-b-sc11_p0247.html
+[5]: https://www.sparkfun.com/products/12052
+[6]: https://www.sparkfun.com/products/501
+[7]: https://www.amazon.com/Raspberry-Pi-Official-Desktop-Starter/dp/B01CI58722/ref=sr_1_1?s=pc&ie=UTF8&qid=1504872134&sr=1-1-spons&keywords=raspberry+pi&psc=1
 
 
 ### 2. Preparing LTC4150
 
 In order to hook it up with the Raspberry Pi (RPi) you first need to solder a few things:
 
-1. First and foremost: solder the two jumpers (SJ2 and SJ3) on its back so that it doesn't fry the RPi
-2. 4-pin female header: solder the header to the pins VIO, INT, POL and GND so that the female part is in the same side as the circuit (and opposite to those jumpers). Pins CLR and SHDN will remain disconnected
-3. Power cables: solder the two hooks to the power input of the counter and two jumper cables to the power output.Hooks with small cable length are preferable as they need to fit inside the case.
+1. First and foremost: solder the two jumpers (`SJ2` and `SJ3`) on its back so that it switches from 5V to 3.3V
+2. 4-pin female header: solder the header to the pins `VIO`, `INT`, `POL` and `GND` so that the female part is in the same side as the circuit (and opposite to those jumpers). Pins `CLR` and `SHDN` will remain disconnected
+3. Power cables: solder the two hooks to the power input of the counter and two jumper cables to the power output. Hooks with small cable length are preferable as they need to fit inside the case.
 
 
 ### 3. Assembly with RPi
 
-First connect the counter to the last pins of the second row as depicted bellow. Then connect the two hooks tp the power supply, the positive to 3.3V (first pin) and the negative to the 13nth pin on the first row, also in the image bellow. Finally attach the screen. Its pins must cover the beginning of the two GPIO pins rows covering the two hooks.
+First connect the counter to the last pins of the second row as depicted bellow. Then connect the two hooks to the power supply, the positive to `3.3V` (first pin) and the negative to `GND` (13nth pin in the first row), also in the image bellow. Finally attach the screen. Its pins must cover the beginning of the two GPIO pins rows covering the two hooks.
 
-Following the BCM numbering scheme those 4 pins are:
-- VIO (voltage reference): pin 21
-- INT (interrupt): pin 20
-- POL (polarity): pin 16
-- GND (ground): GND (pin number 34 on the board)
+There are two ways of numbering the GPIO pins. One is referring to the the physical position of the pin in the board and the other is by the "Broadcom SOC channel" (BCM) number. In the code the later definition is used. A table with the corresponding connections can be fount bellow:
+
+|                         | Board (Pi 3) |  BCM |
+|-------------------------|:------------:|:----:|
+| VIO (voltage reference) |      `pin 34`      |  `pin 21`  |
+| INT (interrupt)         |      `pin 36`      |  `pin 20`  |
+| POL (polarity)          |      `pin 38`      |  `pin 16`  |
+| GND (polarity)          |      `pin 40`      |  `pin GND` |
+| Power IN +              |       `pin 1`      | `pin 3.3V` |
+| Power IN -              |      `pin 25`      |  `pin GND` |
 
 The power source can be either the RPi's 3.3V pin or an external source from 3.3V to 9V. No more than 1A should pass the circuit.
 
@@ -43,7 +54,7 @@ The power source can be either the RPi's 3.3V pin or an external source from 3.3
 
 ### 4. Raspbian setup + screen drivers
 
-The first step is to flash the Raspbian image to the microSD card. As there are plenty of tutorials available on the internet this step won't be covered here.
+The first step is to flash the Raspbian image to the microSD card. As there are plenty of tutorials available on the Internet this step won't be covered here.
 
 Next comes the installation of the driver needed for our screen. As it changes from screen to screen, we'll only cover our specific case. These steps were based on the instructions found on [Waveshare's website][1].
 
