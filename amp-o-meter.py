@@ -5,10 +5,12 @@ from tkinter import ttk
 from threading import Thread
 import os
 import argparse
-
+import json
 
 class Tick:
-    CHARGE = 614.439
+    GVF = 32.55
+    CHARGE_mC = 0
+
     RECHARGING = 1
     DISCHARGING = -1
 
@@ -18,7 +20,7 @@ class Tick:
 
 
 class Counter:
-    def __init__(self, create_csv):
+    def __init__(self, create_csv, resistor_value):
         self.ticks = []
         self.accumulated_charge = 0
         self.avg_current = 0
@@ -26,6 +28,9 @@ class Counter:
         self.create_csv = create_csv
         self.file_name = ""
         self.create_history_file()
+
+        Tick.CHARGE_mC = 1/(Tick.GVF * resistor_value) * 1000
+        print("---> CHARGE_mC: {}".format(Tick.CHARGE_mC))
 
     def create_history_file(self):
         if self.create_csv:
@@ -42,7 +47,7 @@ class Counter:
     def add_tick(self, instant, direction):
         tick = Tick(instant, direction)
         self.ticks.append(tick)
-        self.accumulated_charge += tick.CHARGE * tick.direction
+        self.accumulated_charge += tick.CHARGE_mC * tick.direction
         self.avg_current = self.accumulated_charge/(time()-self.start)
 
         if self.create_csv:
@@ -67,6 +72,8 @@ class Gui:
         self.total_charge = StringVar()
         self.avg_current = StringVar()
         self.file_name = StringVar()
+        self.resistor_value = StringVar()
+        self.charge_mc = StringVar()
 
         self.root.title("AMP-O-METER")
 
@@ -80,12 +87,16 @@ class Gui:
         ttk.Label(self.mainframe, textvariable=self.total_charge).grid(column=3, row=2, sticky=(W, E))
         ttk.Label(self.mainframe, textvariable=self.avg_current).grid(column=4, row=2, sticky=(W, E))
         ttk.Label(self.mainframe, textvariable=self.file_name).grid(columnspan=2, column=2, row=3, sticky=(W, E))
+        ttk.Label(self.mainframe, textvariable=self.resistor_value).grid(column=2, row=4, sticky=(W, E))
+        ttk.Label(self.mainframe, textvariable=self.charge_mc).grid(column=4, row=4, sticky=(W, E))
 
         ttk.Label(self.mainframe, text="Time elapsed:").grid(column=1, row=1, sticky=W)
         ttk.Label(self.mainframe, text="Total ticks:").grid(column=2, row=1, sticky=W)
         ttk.Label(self.mainframe, text="Total charge (mC):").grid(column=3, row=1, sticky=W)
         ttk.Label(self.mainframe, text="Avg current (mA):").grid(column=4, row=1, sticky=W)
         ttk.Label(self.mainframe, text="History file:").grid(column=1, row=3, sticky=W)
+        ttk.Label(self.mainframe, text="Resistor value:").grid(column=1, row=4, sticky=W)
+        ttk.Label(self.mainframe, text="mC per tick:").grid(column=3, row=4, sticky=W)
 
         # self.recharge_button = ttk.Button(self.mainframe, text="Recharge tick").grid(column=1, row=3, sticky=W)
         self.reset_button = ttk.Button(self.mainframe, text="Reset")
@@ -102,12 +113,23 @@ class Gui:
 
 
 class Controller:
-    def __init__(self, polarity_pin=16, interrupt_pin=20, create_csv=False):
+    def __init__(self, polarity_pin=16, interrupt_pin=20, create_csv=False, resistor_value=4.7):
+        print("---> resistor: {}".format(resistor_value))
+        print("---> csv: {}".format(create_csv))
+
+        if create_csv == "on":
+            create_csv = True
+        else:
+            create_csv = False
+
+        print("---> csv: {}".format(create_csv))
+
+        self.resistor_value = resistor_value
         self.polarity_pin = polarity_pin
         self.interrupt_pin = interrupt_pin
         self.vio_pin = 21
 
-        self.counter = Counter(create_csv)
+        self.counter = Counter(create_csv, resistor_value)
         self.gui = Gui()
 
         self.update_time_thread = Thread(target=self.update_time_elapsed, daemon=True)
@@ -118,6 +140,8 @@ class Controller:
 
         self.gui.file_name.set("Waiting for first tick...")
         self.did_tick = False
+        self.gui.resistor_value.set("{:.3g} ohms".format(resistor_value))
+        self.gui.charge_mc.set("{:.4g} mC".format(Tick.CHARGE_mC))
 
     def reset(self, _):
         self.counter.reset()
@@ -176,16 +200,39 @@ class Controller:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--csv", action='store_true')
+    parser.add_argument("--csv")
+    parser.add_argument("--resistor")
     try:
         args = parser.parse_args()
     except:
         print("Unknown arguments passed")
-        raise
+        raise Exception
+
+
+    try:
+        with open('config.json', 'r') as config_file:
+            config = json.load(config_file)
+    except:
+        config = {
+            "resistor_value": 4.7,
+            "enable_csv": "off"
+        }
+
+
+    if args.resistor is not None:
+        config["resistor_value"] = float(args.resistor)
 
     if args.csv is not None:
-        controller = Controller(create_csv=True)
-    else:
-        controller = Controller(create_csv=False)
+        if args.csv == "on" or args.csv == "off":
+            config["enable_csv"] = args.csv
+        else:
+            print("Unknown value of option '--csv'. Please choose either 'on' or 'off' (without quotes)")
+            raise Exception
+
+    with open('config.json', 'w') as config_file:
+        json.dump(config, config_file)
+
+
+    controller = Controller(create_csv=config["enable_csv"], resistor_value=config["resistor_value"])
 
     controller.run()
