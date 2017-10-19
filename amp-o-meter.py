@@ -185,7 +185,7 @@ class TerminalUI:
             sleep(0.1)
 
 class Controller:
-    def __init__(self, polarity_pin=16, interrupt_pin=20, vio_pin=21, create_csv=False, resistor_value=4.7, terminal_ui=True):
+    def __init__(self, polarity_pin, interrupt_pin, vio_pin, create_csv=False, resistor_value=4.7, terminal_ui=True):
         if create_csv == "on":
             create_csv = True
         else:
@@ -276,9 +276,13 @@ class Controller:
 
 if __name__ == "__main__":
 
+    # TODO: create a section on readme for these arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv")
     parser.add_argument("--resistor")
+    parser.add_argument("--pol_pin")
+    parser.add_argument("--int_pin")
+    parser.add_argument("--vio_pin")
     parser.add_argument("--terminal", action='store_true')
     try:
         args = parser.parse_args()
@@ -293,12 +297,24 @@ if __name__ == "__main__":
     except:
         config = {
             "resistor_value": 4.7,
-            "enable_csv": "off"
+            "enable_csv": "off",
+            "pol_pin": 16,
+            "int_pin": 20,
+            "vio_pin": 21
         }
 
 
     if args.resistor is not None:
         config["resistor_value"] = float(args.resistor)
+
+    if args.pol_pin is not None:
+        config["pol_pin"] = int(args.pol_pin)
+
+    if args.int_pin is not None:
+        config["int_pin"] = int(args.int_pin)
+
+    if args.vio_pin is not None:
+        config["vio_pin"] = int(args.vio_pin)
 
     if args.csv is not None:
         if args.csv == "on" or args.csv == "off":
@@ -307,7 +323,6 @@ if __name__ == "__main__":
             print("Unknown value of option '--csv'. Please choose either 'on' or 'off' (without quotes)")
             raise Exception
 
-    print("terminal: {}".format(args.terminal))
     if args.terminal is not None:
         print(1)
         config["terminal_ui"] = False or args.terminal
@@ -319,11 +334,16 @@ if __name__ == "__main__":
     with open('config.json', 'w') as config_file:
         json.dump(config, config_file)
 
-    print("--- Run config: \n       resistor value: {}\n       csv: {}\n       create_gui: {}".format(config["resistor_value"],
-                                                                                                       config["enable_csv"],
-                                                                                                       config["terminal_ui"]))
+    print("--- Run config: \n       resistor value: {}\n       csv: {}\n       create_gui: {}\n"
+          "       pol_pin: {}\n       int_pin: {}\n       vio_pin: {}".format(config["resistor_value"],
+                                                                                config["enable_csv"],
+                                                                                config["terminal_ui"],
+                                                                                config["pol_pin"],
+                                                                                config["int_pin"],
+                                                                                config["vio_pin"]))
     try:
-        controller = Controller(create_csv=config["enable_csv"], resistor_value=config["resistor_value"], terminal_ui=config["terminal_ui"])
+        controller = Controller(create_csv=config["enable_csv"], resistor_value=config["resistor_value"], terminal_ui=config["terminal_ui"],
+                                polarity_pin=config["pol_pin"], interrupt_pin=config["int_pin"], vio_pin=config["vio_pin"])
         controller.run()
     except KeyboardInterrupt:
         GPIO.cleanup()
