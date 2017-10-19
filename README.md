@@ -107,6 +107,8 @@ As explained above, you may need to change the resistor value, so in order for t
 
 For debugging and further analysis purposes a _csv_ file can be created with an absolute timestamp, a timestamp relative to the beginning and the direction of change (1 for charging and -1 for discharging) for each detected tick. This option is disabled by default and can be toggled on/off with the flag `--csv` followed by either `on` or `off` (e.g. `python3 amp-o-meter.py --csv on`).  
 
+Finally, if you want to run the counter via the terminal without a GUI, you just need to append the flag `--terminal` to the command. This can be useful when accessing the RPi via _ssh_.
+
 That's it! Your final setup should look like this:
 ![Alt text](/../images/img/img4.JPG?raw=true "Optional Title")
 
