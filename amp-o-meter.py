@@ -72,7 +72,7 @@ class Counter:
             std_deviation_timediff = statistics.pstdev(self.tick_diffs)
             if std_deviation_timediff != 0:
                 self.std_deviation_current = tick.CHARGE_mC/mean - tick.CHARGE_mC/(mean + std_deviation_timediff)
-            print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
+            # print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
 
         if self.create_csv:
             with open(self.file_name, 'a') as file:
@@ -149,8 +149,7 @@ class TerminalUI:
             return "{: <22}: {} \033[K".format(self.description, self.value)
 
         def set(self, new_value):
-            assert isinstance(new_value, str), "Expected string got {}".format(type(new_value))
-            self.value = new_value
+            self.value = str(new_value)
 
     def __init__(self):
         self.print_thread = threading.Thread(target=self.run, daemon=True)
@@ -183,10 +182,10 @@ class TerminalUI:
             print(self.file_name)
 
             first_run = False
-            sleep(1)
+            sleep(0.1)
 
 class Controller:
-    def __init__(self, polarity_pin=16, interrupt_pin=20, create_csv=False, resistor_value=4.7, terminal_ui=True):
+    def __init__(self, polarity_pin=16, interrupt_pin=20, vio_pin=21, create_csv=False, resistor_value=4.7, terminal_ui=True):
         if create_csv == "on":
             create_csv = True
         else:
@@ -195,7 +194,7 @@ class Controller:
         self.resistor_value = resistor_value
         self.polarity_pin = polarity_pin
         self.interrupt_pin = interrupt_pin
-        self.vio_pin = 21
+        self.vio_pin = vio_pin
         self.terminal_gui = terminal_ui
 
         self.counter = Counter(create_csv, resistor_value)
@@ -242,7 +241,7 @@ class Controller:
 
     def update_gui(self):
         self.gui.number_of_ticks.set(len(self.counter.ticks))
-        self.gui.total_charge.set("{:8.2f}".format(self.counter.accumulated_charge))
+        self.gui.total_charge.set("{:7.2f}".format(self.counter.accumulated_charge))
         self.gui.avg_current.set("{:5.3f}".format(self.counter.avg_current))
         self.gui.std_deviation_current.set("{:5.3f}".format(self.counter.std_deviation_current))
         self.gui.file_name.set(self.counter.file_name)
