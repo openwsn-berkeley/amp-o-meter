@@ -52,7 +52,7 @@ class Counter:
             self.file_name = "history/history_{}.csv".format(
                                    strftime('%Y-%m-%d %H:%M:%S', localtime(time())).replace(' ', '_'))
             with open(self.file_name, 'w') as file:
-                file.write('time_absolute,time_relative,direction\n')
+                file.write('time_absolute,time_relative,direction,avg_current\n')
         else:
             self.file_name = "csv file creation deactivated"
 
@@ -76,7 +76,7 @@ class Counter:
 
         if self.create_csv:
             with open(self.file_name, 'a') as file:
-                file.write('{},{},{}\n'.format(time(), time()-self.start, direction))
+                file.write('{},{},{},{}\n'.format(time(), time()-self.start, direction, self.avg_current))
 
     def reset(self):
         self.ticks = []
