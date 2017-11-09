@@ -228,7 +228,7 @@ class TerminalUI:
 
 
 class Controller:
-    def __init__(self, polarity_pin, interrupt_pin, vio_pin, create_csv=False, resistor_value=4.7, terminal_ui=True, ma_period=0):
+    def __init__(self, polarity_pin, interrupt_pin, vio_pin, create_csv=False, resistor_value=4.7, ui_type="gui", ma_period=0):
         if create_csv == "on":
             create_csv = True
         else:
@@ -238,14 +238,17 @@ class Controller:
         self.polarity_pin = polarity_pin
         self.interrupt_pin = interrupt_pin
         self.vio_pin = vio_pin
-        self.terminal_gui = terminal_ui
+        self.ui_type = ui_type
         self.ma_period = ma_period
 
         self.counter = Counter(create_csv, resistor_value, self.ma_period)
 
-        if self.terminal_gui:
+        if self.ui_type is None:
+            # print("--- UI DISABLED ---")
+            return
+        elif self.ui_type == "terminal":
             self.gui = TerminalUI()
-        else:
+        elif self.ui_type == "gui":
             try:
                 self.gui = TkGui()
                 self.gui.reset_button.bind("<Button>", self.reset)
@@ -253,26 +256,31 @@ class Controller:
                 # traceback.print_exc()
                 print("\nAre you running this via shh? Either enable remote X server or run this script with the flag --terminal\n")
 
-        self.gui.file_name.set("Waiting for first tick...")
-        self.did_tick = False
-        self.gui.resistor_value.set("{:.3g} ohms".format(resistor_value))
-        self.gui.charge_mc.set("{:.4g} mC".format(Tick.CHARGE_mC))
-        self.gui.ma_period.set("{} ticks".format(ma_period))
+        if self.ui_type is not None:
+            self.gui.file_name.set("Waiting for first tick...")
+            self.did_tick = False
+            self.gui.resistor_value.set("{:.3g} ohms".format(resistor_value))
+            self.gui.charge_mc.set("{:.4g} mC".format(Tick.CHARGE_mC))
+            self.gui.ma_period.set("{} ticks".format(ma_period))
 
-        self.update_time_thread = Thread(target=self.update_time_elapsed, daemon=True)
-        self.update_time_thread.start()
+            self.update_time_thread = Thread(target=self.update_time_elapsed, daemon=True)
+            self.update_time_thread.start()
 
     def reset(self, _):
         self.counter.reset()
-        self.gui.file_name.set("Waiting for first tick...")
-        self.gui.number_of_ticks.set("")
-        self.gui.total_charge.set("")
-        self.gui.avg_current.set("")
-        self.gui.std_deviation_current.set("")
+
+        if self.ui_type is not None:
+            self.gui.file_name.set("Waiting for first tick...")
+            self.gui.number_of_ticks.set("")
+            self.gui.total_charge.set("")
+            self.gui.avg_current.set("")
+            self.gui.std_deviation_current.set("")
 
     def run(self):
         self.setup_probe()
-        self.gui.run()
+
+        if self.ui_type is not None:
+            self.gui.run()
 
     def add_tick(self, direction=Tick.DISCHARGING):
         if not self.did_tick:
@@ -285,13 +293,14 @@ class Controller:
             self.update_gui()
 
     def update_gui(self):
-        self.gui.number_of_ticks.set(self.counter.number_of_ticks)
-        self.gui.number_of_positive_ticks.set(self.counter.number_of_positive_ticks)
-        self.gui.number_of_negative_ticks.set(self.counter.number_of_negative_ticks)
-        self.gui.total_charge.set("{:7.2f}".format(self.counter.accumulated_charge))
-        self.gui.avg_current.set("{:5.3f}".format(self.counter.avg_current))
-        self.gui.std_deviation_current.set("{:5.3f}".format(self.counter.std_deviation_current))
-        self.gui.file_name.set(self.counter.file_name)
+        if self.ui_type is not None:
+            self.gui.number_of_ticks.set(self.counter.number_of_ticks)
+            self.gui.number_of_positive_ticks.set(self.counter.number_of_positive_ticks)
+            self.gui.number_of_negative_ticks.set(self.counter.number_of_negative_ticks)
+            self.gui.total_charge.set("{:7.2f}".format(self.counter.accumulated_charge))
+            self.gui.avg_current.set("{:5.3f}".format(self.counter.avg_current))
+            self.gui.std_deviation_current.set("{:5.3f}".format(self.counter.std_deviation_current))
+            self.gui.file_name.set(self.counter.file_name)
 
     def update_time_elapsed(self):
         while True:
@@ -324,6 +333,7 @@ class Controller:
 if __name__ == "__main__":
 
     # TODO: create a section on readme for these arguments
+    # TODO: and a help section when running the command without anything
     parser = argparse.ArgumentParser()
     parser.add_argument("--csv")
     parser.add_argument("--resistor")
@@ -331,7 +341,7 @@ if __name__ == "__main__":
     parser.add_argument("--int_pin")
     parser.add_argument("--vio_pin")
     parser.add_argument("--ma_period")
-    parser.add_argument("--terminal", action='store_true')
+    parser.add_argument("--ui_type")
     try:
         args = parser.parse_args()
     except:
@@ -374,27 +384,29 @@ if __name__ == "__main__":
             print("Unknown value of option '--csv'. Please choose either 'on' or 'off' (without quotes)")
             raise Exception
 
-    if args.terminal is not None:
-        print(1)
-        config["terminal_ui"] = False or args.terminal
-    else:
-        print(2)
-        config["terminal_ui"] = True
-
+    if args.ui_type is not None:
+        if args.ui_type == "gui" or args.ui_type == "terminal" or args.ui_type == "off":
+            if args.ui_type == "off":
+                config["ui_type"] = None
+            else:
+                config["ui_type"] = args.ui_type
+        else:
+            print("Unknown value of option '--ui_type'. Please choose either 'gui', 'terminal' or 'off' (without quotes)")
+            raise Exception
 
     with open('config.json', 'w') as config_file:
         json.dump(config, config_file)
 
-    print("--- Run config: \n       resistor value: {}\n       csv: {}\n       create_gui: {}\n"
+    print("--- Run config: \n       resistor value: {}\n       csv: {}\n       ui_type: {}\n"
           "       pol_pin: {}\n       int_pin: {}\n       vio_pin: {}\n       ma_period: {}".format(config["resistor_value"],
                                                                                 config["enable_csv"],
-                                                                                config["terminal_ui"],
+                                                                                config["ui_type"],
                                                                                 config["pol_pin"],
                                                                                 config["int_pin"],
                                                                                 config["vio_pin"],
                                                                                 config["ma_period"]))
     try:
-        controller = Controller(create_csv=config["enable_csv"], resistor_value=config["resistor_value"], terminal_ui=config["terminal_ui"],
+        controller = Controller(create_csv=config["enable_csv"], resistor_value=config["resistor_value"], ui_type=config["ui_type"],
                                 polarity_pin=config["pol_pin"], interrupt_pin=config["int_pin"], vio_pin=config["vio_pin"],
                                 ma_period=config["ma_period"])
         controller.run()

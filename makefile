@@ -1,5 +1,5 @@
 deploy:
-	scp amp-o-meter.py run.sh pi@raspberrypi.local:~/Desktop
+	scp amp-o-meter.py run.sh pi@rp2.local:~/amp-o-meter/
 
 get_results:
-	scp  pi@raspberrypi.local:~/Desktop/history/* ./history/
+	scp  pi@rp2.local:~/Desktop/history/* ./history/
