@@ -29,7 +29,7 @@ class Tick:
 
 
 class Counter:
-    def __init__(self, create_csv, resistor_value):
+    def __init__(self, create_csv, resistor_value, ma_period):
         self.ticks = []
         self.tick_diffs = []
         self.accumulated_charge = 0
@@ -40,9 +40,30 @@ class Counter:
         self.create_history_file()
         self.std_deviation_current = 0
         self.previous_tick_instant = None
+        self.ma_period = ma_period
 
         Tick.CHARGE_mC = 1/(Tick.GVF * resistor_value) * 1000
         print("---> CHARGE_mC: {}".format(Tick.CHARGE_mC))
+
+    @property
+    def number_of_ticks(self):
+        return len(self.ticks)
+
+    @property
+    def number_of_positive_ticks(self):
+        counter = 0
+        for tick in self.ticks:
+            if tick.direction > 0:
+                counter += 1
+        return counter
+
+    @property
+    def number_of_negative_ticks(self):
+        counter = 0
+        for tick in self.ticks:
+            if tick.direction < 0:
+                counter += 1
+        return counter
 
     def create_history_file(self):
         if self.create_csv:
@@ -59,10 +80,22 @@ class Counter:
     def add_tick(self, instant, direction):
         tick = Tick(instant, direction)
         self.ticks.append(tick)
-        self.accumulated_charge += tick.CHARGE_mC * tick.direction
-        self.avg_current = self.accumulated_charge/(time()-self.start)
 
-        # TODO: test standard deviation calculation
+        if self.ma_period != 0:
+            self.accumulated_charge = 0
+            reference_instant = None
+            for tick in self.ticks[-self.ma_period:]:
+                if reference_instant is None:
+                    reference_instant = tick.instant
+                else:
+                    self.accumulated_charge += tick.CHARGE_mC * tick.direction
+            self.avg_current = self.accumulated_charge / (time() - reference_instant)
+        else:
+            self.accumulated_charge += tick.CHARGE_mC * tick.direction
+            self.avg_current = self.accumulated_charge / (time() - self.start)
+
+
+# TODO: test standard deviation calculation
         if self.previous_tick_instant is None:
             self.previous_tick_instant = instant
         else:
@@ -72,7 +105,7 @@ class Counter:
             std_deviation_timediff = statistics.pstdev(self.tick_diffs)
             if std_deviation_timediff != 0:
                 self.std_deviation_current = tick.CHARGE_mC/mean - tick.CHARGE_mC/(mean + std_deviation_timediff)
-            # print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
+                # print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
 
         if self.create_csv:
             with open(self.file_name, 'a') as file:
@@ -99,6 +132,10 @@ class TkGui:
         self.resistor_value = StringVar()
         self.charge_mc = StringVar()
         self.std_deviation_current = StringVar()
+
+        self.ma_period = StringVar()
+        self.number_of_positive_ticks = StringVar()
+        self.number_of_negative_ticks = StringVar()
 
         self.root.title("AMP-O-METER")
 
@@ -156,36 +193,42 @@ class TerminalUI:
 
         self.time_elapsed    = self.Parameter("Time elapsed")
         self.number_of_ticks = self.Parameter("Total ticks")
+        self.number_of_positive_ticks = self.Parameter("Total positive ticks")
+        self.number_of_negative_ticks = self.Parameter("Total negative ticks")
         self.total_charge    = self.Parameter("Total charge (mC)")
         self.avg_current     = self.Parameter("Avg current (mA)")
         self.file_name       = self.Parameter("History file")
         self.resistor_value  = self.Parameter("Resistor value")
         self.charge_mc       = self.Parameter("mC per tick")
         self.std_deviation_current = self.Parameter("Std deviation (mA)")
-
+        self.ma_period       = self.Parameter("Moving average period")
 
     def run(self):
         first_run = True
 
         while True:
             if not first_run:
-                sys.stdout.write("\033[F"*10)
+                sys.stdout.write("\033[F"*13)
 
             print("\n ---- AMP-O-METER ---- \033[K")
             print(self.time_elapsed)
             print(self.number_of_ticks)
+            print(self.number_of_positive_ticks)
+            print(self.number_of_negative_ticks)
             print(self.avg_current)
             print(self.total_charge)
             print(self.resistor_value)
             print(self.charge_mc)
             print(self.std_deviation_current)
             print(self.file_name)
+            print(self.ma_period)
 
             first_run = False
             sleep(0.1)
 
+
 class Controller:
-    def __init__(self, polarity_pin, interrupt_pin, vio_pin, create_csv=False, resistor_value=4.7, terminal_ui=True):
+    def __init__(self, polarity_pin, interrupt_pin, vio_pin, create_csv=False, resistor_value=4.7, terminal_ui=True, ma_period=0):
         if create_csv == "on":
             create_csv = True
         else:
@@ -196,8 +239,9 @@ class Controller:
         self.interrupt_pin = interrupt_pin
         self.vio_pin = vio_pin
         self.terminal_gui = terminal_ui
+        self.ma_period = ma_period
 
-        self.counter = Counter(create_csv, resistor_value)
+        self.counter = Counter(create_csv, resistor_value, self.ma_period)
 
         if self.terminal_gui:
             self.gui = TerminalUI()
@@ -213,6 +257,7 @@ class Controller:
         self.did_tick = False
         self.gui.resistor_value.set("{:.3g} ohms".format(resistor_value))
         self.gui.charge_mc.set("{:.4g} mC".format(Tick.CHARGE_mC))
+        self.gui.ma_period.set("{} ticks".format(ma_period))
 
         self.update_time_thread = Thread(target=self.update_time_elapsed, daemon=True)
         self.update_time_thread.start()
@@ -240,7 +285,9 @@ class Controller:
             self.update_gui()
 
     def update_gui(self):
-        self.gui.number_of_ticks.set(len(self.counter.ticks))
+        self.gui.number_of_ticks.set(self.counter.number_of_ticks)
+        self.gui.number_of_positive_ticks.set(self.counter.number_of_positive_ticks)
+        self.gui.number_of_negative_ticks.set(self.counter.number_of_negative_ticks)
         self.gui.total_charge.set("{:7.2f}".format(self.counter.accumulated_charge))
         self.gui.avg_current.set("{:5.3f}".format(self.counter.avg_current))
         self.gui.std_deviation_current.set("{:5.3f}".format(self.counter.std_deviation_current))
@@ -283,6 +330,7 @@ if __name__ == "__main__":
     parser.add_argument("--pol_pin")
     parser.add_argument("--int_pin")
     parser.add_argument("--vio_pin")
+    parser.add_argument("--ma_period")
     parser.add_argument("--terminal", action='store_true')
     try:
         args = parser.parse_args()
@@ -300,9 +348,9 @@ if __name__ == "__main__":
             "enable_csv": "off",
             "pol_pin": 16,
             "int_pin": 20,
-            "vio_pin": 21
+            "vio_pin": 21,
+            "ma_period": 10
         }
-
 
     if args.resistor is not None:
         config["resistor_value"] = float(args.resistor)
@@ -315,6 +363,9 @@ if __name__ == "__main__":
 
     if args.vio_pin is not None:
         config["vio_pin"] = int(args.vio_pin)
+
+    if args.ma_period is not None:
+        config["ma_period"] = int(args.ma_period)
 
     if args.csv is not None:
         if args.csv == "on" or args.csv == "off":
@@ -335,15 +386,17 @@ if __name__ == "__main__":
         json.dump(config, config_file)
 
     print("--- Run config: \n       resistor value: {}\n       csv: {}\n       create_gui: {}\n"
-          "       pol_pin: {}\n       int_pin: {}\n       vio_pin: {}".format(config["resistor_value"],
+          "       pol_pin: {}\n       int_pin: {}\n       vio_pin: {}\n       ma_period: {}".format(config["resistor_value"],
                                                                                 config["enable_csv"],
                                                                                 config["terminal_ui"],
                                                                                 config["pol_pin"],
                                                                                 config["int_pin"],
-                                                                                config["vio_pin"]))
+                                                                                config["vio_pin"],
+                                                                                config["ma_period"]))
     try:
         controller = Controller(create_csv=config["enable_csv"], resistor_value=config["resistor_value"], terminal_ui=config["terminal_ui"],
-                                polarity_pin=config["pol_pin"], interrupt_pin=config["int_pin"], vio_pin=config["vio_pin"])
+                                polarity_pin=config["pol_pin"], interrupt_pin=config["int_pin"], vio_pin=config["vio_pin"],
+                                ma_period=config["ma_period"])
         controller.run()
     except KeyboardInterrupt:
         GPIO.cleanup()
