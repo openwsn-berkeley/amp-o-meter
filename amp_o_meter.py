@@ -43,7 +43,7 @@ class Counter:
         self.ma_period = ma_period
 
         Tick.CHARGE_mC = 1/(Tick.GVF * resistor_value) * 1000
-        print("---> CHARGE_mC: {}".format(Tick.CHARGE_mC))
+        # print("---> CHARGE_mC: {}".format(Tick.CHARGE_mC))
 
     @property
     def number_of_ticks(self):
@@ -95,14 +95,14 @@ class Counter:
             self.avg_current = self.accumulated_charge / (time() - self.start)
 
 
-# TODO: test standard deviation calculation
+        # TODO: test standard deviation calculation
         if self.previous_tick_instant is None:
             self.previous_tick_instant = instant
         else:
             self.tick_diffs.append(instant - self.previous_tick_instant)
             self.previous_tick_instant = instant
-            mean = statistics.mean(self.tick_diffs)
-            std_deviation_timediff = statistics.pstdev(self.tick_diffs)
+            mean = statistics.mean(self.tick_diffs[self.ma_period:])
+            std_deviation_timediff = statistics.pstdev(self.tick_diffs[self.ma_period:])
             if std_deviation_timediff != 0:
                 self.std_deviation_current = tick.CHARGE_mC/mean - tick.CHARGE_mC/(mean + std_deviation_timediff)
                 # print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
@@ -243,7 +243,7 @@ class Controller:
 
         self.counter = Counter(create_csv, resistor_value, self.ma_period)
 
-        if self.ui_type is None:
+        if self.ui_type is None or self.ui_type == "off":
             # print("--- UI DISABLED ---")
             return
         elif self.ui_type == "terminal":
@@ -255,6 +255,9 @@ class Controller:
             except  TclError:
                 # traceback.print_exc()
                 print("\nAre you running this via shh? Either enable remote X server or run this script with the flag --terminal\n")
+        else:
+            print(" --- ERROR: no ui type specified! ---")
+            raise Exception
 
         if self.ui_type is not None:
             self.gui.file_name.set("Waiting for first tick...")
@@ -386,10 +389,7 @@ if __name__ == "__main__":
 
     if args.ui_type is not None:
         if args.ui_type == "gui" or args.ui_type == "terminal" or args.ui_type == "off":
-            if args.ui_type == "off":
-                config["ui_type"] = None
-            else:
-                config["ui_type"] = args.ui_type
+            config["ui_type"] = args.ui_type
         else:
             print("Unknown value of option '--ui_type'. Please choose either 'gui', 'terminal' or 'off' (without quotes)")
             raise Exception
