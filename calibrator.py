@@ -1,15 +1,15 @@
 import sys
-import fake_rpi
-import numpy as np
-import json
 
-sys.modules['RPi'] = fake_rpi.RPi     # Fake RPi (GPIO)
-print("DEV VERSION!!! GPIO PINS DISABLED!!!")
+# import fake_rpi
+# sys.modules['RPi'] = fake_rpi.RPi     # Fake RPi (GPIO)
+# print("DEV VERSION!!! GPIO PINS DISABLED!!!")
 
 if sys.version_info[0] < 3:
     print('You need to run this with Python 3')
     sys.exit(1)
 
+import numpy as np
+import json
 from amp_o_meter import *
 from time import time
 
@@ -64,11 +64,18 @@ if __name__ == "__main__":
         print("Could you please type a valid number the next time?")
         raise
 
+    number_of_loops = input("How many loops in the sensor? : ")
+    try:
+        number_of_loops = float(number_of_loops)
+    except:
+        print("Could you please type a valid number the next time?")
+        raise
+
     while True: # test loop: does all measurements
-        print("\n----- New test --------------------------------")
+        print("\n----- New test ----------------------------------------------------------")
         print(" -- Type the real current value to begin a test")
         print(" -- Type F to finish tests and calculate calibration parameters")
-        choice = input("Choice: ")
+        choice = input("Value or F: ")
 
         try:
             real_current = float(choice)
@@ -99,15 +106,20 @@ if __name__ == "__main__":
 
         for sensor in sensor_list:
             sensor_id = sensor["id"]
-            avg_current = sensor["controller"].counter.avg_current
+            ticks_per_second = sensor["controller"].counter.ticks_per_second
             del sensor["controller"]
 
-            test_data[sensor_id] = avg_current
-            print("   Sensor {}: {} mA".format(sensor_id, avg_current))
+            test_data[sensor_id] = ticks_per_second
+            print("   Sensor {}: {} ticks/second".format(sensor_id, ticks_per_second))
         print("")
 
+        print(" -- Type again the real current value to begin a test")
+        value = input("Value or F: ")
+        test_data["real_current"] = (test_data["real_current"] + float(value))/2
+        print(" -- Value for the real_current stored: {}".format(test_data["real_current"]))
+
         while True: # save data loop: waits for a valid response
-            save_data = input("Do you want to save this test? [Y,n]: ")
+            save_data = input("\nDo you want to save this test? [Y,n]: ")
 
             if save_data.upper() == 'Y' or save_data == '':
                 saved_tests.append(test_data)
@@ -118,6 +130,7 @@ if __name__ == "__main__":
             else:
                 print("Invalid option, please choose another")
 
+    print("----- Interpolation ---------------------------------------------------------")
     # Calculate calibration coefficients
     # X axis is sensor data
     # Y axis is real current
@@ -143,6 +156,8 @@ if __name__ == "__main__":
             file_name += ".json"
             with open(file_name, 'w') as json_file:
                 all_data = {
+                    "test_duration_seconds": duration,
+                    "number_of_loops": number_of_loops,
                     "sensor_list": sensor_list,
                     "saved_tests": saved_tests
                 }
@@ -151,6 +166,9 @@ if __name__ == "__main__":
                 print("Bye bye!")
             break
         elif save_data.upper() == 'N':
+
             break
         else:
             print("Invalid option, please choose another")
+
+    print("\n----- Calibration finished. Bye bye! --------------------------------------\n\n")

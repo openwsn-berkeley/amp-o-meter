@@ -34,6 +34,7 @@ class Counter:
         self.tick_diffs = []
         self.accumulated_charge = 0
         self.avg_current = 0
+        self.ticks_per_second = 0
         self.start = time()
         self.create_csv = create_csv
         self.file_name = ""
@@ -89,10 +90,16 @@ class Counter:
                     reference_instant = tick.instant
                 else:
                     self.accumulated_charge += tick.CHARGE_mC * tick.direction
-            self.avg_current = self.accumulated_charge / (time() - reference_instant)
+
+            if time() - reference_instant > 0:
+                self.avg_current = self.accumulated_charge / (time() - reference_instant)
+                self.ticks_per_second = (self.ma_period-1) / (time() - reference_instant)
         else:
             self.accumulated_charge += tick.CHARGE_mC * tick.direction
-            self.avg_current = self.accumulated_charge / (time() - self.start)
+
+            if time() - self.start > 0:
+                self.avg_current = self.accumulated_charge / (time() - self.start)
+                self.ticks_per_second = (len(self.ticks_per_second)-1) / (time() - self.start)
 
 
         # TODO: test standard deviation calculation
@@ -115,6 +122,7 @@ class Counter:
         self.ticks = []
         self.accumulated_charge = 0
         self.avg_current = 0
+        self.ticks_per_second = 0
         self.start = time()
         self.create_history_file()
 
@@ -362,7 +370,8 @@ if __name__ == "__main__":
             "pol_pin": 16,
             "int_pin": 20,
             "vio_pin": 21,
-            "ma_period": 10
+            "ma_period": 10,
+            "ui_type": "terminal"
         }
 
     if args.resistor is not None:
