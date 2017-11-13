@@ -101,11 +101,12 @@ class Counter:
         else:
             self.tick_diffs.append(instant - self.previous_tick_instant)
             self.previous_tick_instant = instant
-            mean = statistics.mean(self.tick_diffs[self.ma_period:])
-            std_deviation_timediff = statistics.pstdev(self.tick_diffs[self.ma_period:])
-            if std_deviation_timediff != 0:
-                self.std_deviation_current = tick.CHARGE_mC/mean - tick.CHARGE_mC/(mean + std_deviation_timediff)
-                # print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
+            if len(self.tick_diffs[self.ma_period:]) > 1:
+                mean = statistics.mean(self.tick_diffs[self.ma_period:])
+                std_deviation_timediff = statistics.pstdev(self.tick_diffs[self.ma_period:])
+                if std_deviation_timediff != 0:
+                    self.std_deviation_current = tick.CHARGE_mC/mean - tick.CHARGE_mC/(mean + std_deviation_timediff)
+                    # print("mean: {}, std_time: {}, std_cur: {}".format(mean, std_deviation_timediff, self.std_deviation_current))
 
         if self.create_csv:
             with open(self.file_name, 'a') as file:
@@ -225,6 +226,7 @@ class TerminalUI:
 
             first_run = False
             sleep(0.1)
+            print("---------------------------------------------------------------------")
 
 
 class Controller:
@@ -240,10 +242,12 @@ class Controller:
         self.vio_pin = vio_pin
         self.ui_type = ui_type
         self.ma_period = ma_period
+        self.did_tick = False
 
         self.counter = Counter(create_csv, resistor_value, self.ma_period)
 
         if self.ui_type is None or self.ui_type == "off":
+            self.ui_type = None
             # print("--- UI DISABLED ---")
             return
         elif self.ui_type == "terminal":
@@ -261,13 +265,15 @@ class Controller:
 
         if self.ui_type is not None:
             self.gui.file_name.set("Waiting for first tick...")
-            self.did_tick = False
             self.gui.resistor_value.set("{:.3g} ohms".format(resistor_value))
             self.gui.charge_mc.set("{:.4g} mC".format(Tick.CHARGE_mC))
             self.gui.ma_period.set("{} ticks".format(ma_period))
 
             self.update_time_thread = Thread(target=self.update_time_elapsed, daemon=True)
             self.update_time_thread.start()
+
+    def clean_gpio(self):
+        GPIO.cleanup()
 
     def reset(self, _):
         self.counter.reset()
