@@ -9,31 +9,46 @@ if sys.version_info[0] < 3:
     sys.exit(1)
 
 import numpy as np
-import json
 from amp_o_meter import *
 from time import time
+import json
+from sklearn import datasets, linear_model
+from sklearn.metrics import mean_squared_error, r2_score
 
 
 def create_controller(sensor):
-    return Controller(
+    controller = Controller(
         create_csv=sensor["create_csv"],
         resistor_value=sensor["resistor_value"],
-        ui_type=sensor["ui_type"],
+        ui_type="off",
         polarity_pin=sensor["polarity_pin"],
         interrupt_pin=sensor["interrupt_pin"],
         vio_pin=sensor["vio_pin"],
         ma_period=sensor["ma_period"]
     )
+    controller.run()
+    return controller
 
 
 def calculate_lin_reg_coeffs(x, y):
-    x = [[1, 1], [1, 2], [1, 3], [1, 4]]
-    y = [10, 8, 6, 4]
+    # x = [[1, 1], [1, 2], [1, 3], [1, 4]]
+    # y = [10, 8, 6, 4]
 
-    x = np.array(x)
-    y = np.transpose(np.array(y))
-    coeffs = np.dot(np.dot(np.linalg.inv(np.dot(np.transpose(x), x)), np.transpose(x)), y)
-    return coeffs.tolist()
+    x = np.array(x)[np.newaxis].T
+    y = np.array(y)
+    regr = linear_model.LinearRegression()
+    regr.fit(x, y)
+    y_pred = regr.predict(x)
+    print('Coefficients: y = {:.3g} * x + {:.3g}'.format(regr.coef_[0], regr.intercept_))
+    print("Mean squared error: %.2f" % mean_squared_error(y, y_pred))
+    print('Variance score: %.2f' % r2_score(y, y_pred))
+
+    return {
+        "a": regr.coef_[0],
+        "b": regr.intercept_,
+        "mean_squared_error": mean_squared_error(y, y_pred),
+        "r_squared": r2_score(y, y_pred)
+    }
 
 
 if __name__ == "__main__":
@@ -49,7 +64,6 @@ if __name__ == "__main__":
             "int_pin": int_pin,
             "create_csv": "off",
             "resistor_value": 7.5,
-            "ui_type": "off",
             "polarity_pin": pol_pins[index],
             "interrupt_pin": int_pin,
             "vio_pin": 4,
@@ -105,6 +119,7 @@ if __name__ == "__main__":
             sys.stdout.flush()
 
         for sensor in sensor_list:
+            sensor["controller"].clean_gpio()
             sensor_id = sensor["id"]
             ticks_per_second = sensor["controller"].counter.ticks_per_second
             del sensor["controller"]
@@ -141,12 +156,13 @@ if __name__ == "__main__":
         x = []
 
         for index, test in enumerate(saved_tests):
-            x.append([1, test[sensor["id"]]])
+            x.append(test[sensor["id"]])
             y.append(test["real_current"])
 
-        coeffs = calculate_lin_reg_coeffs(x, y)
-        sensor["coeffs"] = coeffs
-        print("Sensor {}: estimated_current = {} + {} * sensor_current".format(sensor["id"], coeffs[0], coeffs[1]))
+        print("--- Sensor {} --------------------".format(sensor["id"]))
+        regression_data = calculate_lin_reg_coeffs(x, y)
+        sensor["regression_data"] = regression_data
+        # print("Sensor {}: estimated_current = {} + {} * sensor_current".format(sensor["id"], regression_data["b"], regression_data["a"]))
 
     while True:  # save to file loop: waits for a valid response
         save_data = input("\nDo you want to save all data to a file? [Y,n]: ")
