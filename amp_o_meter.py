@@ -99,7 +99,7 @@ class Counter:
 
             if time() - self.start > 0:
                 self.avg_current = self.accumulated_charge / (time() - self.start)
-                self.ticks_per_second = (len(self.ticks_per_second)-1) / (time() - self.start)
+                self.ticks_per_second = (len(self.ticks)-1) / (time() - self.start)
 
 
         # TODO: test standard deviation calculation
@@ -121,11 +121,14 @@ class Counter:
 
     def reset(self):
         self.ticks = []
+        self.tick_diffs = []
         self.accumulated_charge = 0
         self.avg_current = 0
         self.ticks_per_second = 0
         self.start = time()
         self.create_history_file()
+        self.std_deviation_current = 0
+        self.previous_tick_instant = None
 
 
 class TkGui:
@@ -145,6 +148,7 @@ class TkGui:
         self.ma_period = StringVar()
         self.number_of_positive_ticks = StringVar()
         self.number_of_negative_ticks = StringVar()
+        self.ticks_per_second = StringVar()
 
         self.root.title("AMP-O-METER")
 
@@ -204,6 +208,7 @@ class TerminalUI:
         self.number_of_ticks = self.Parameter("Total ticks")
         self.number_of_positive_ticks = self.Parameter("Total positive ticks")
         self.number_of_negative_ticks = self.Parameter("Total negative ticks")
+        self.ticks_per_second = self.Parameter("Ticks per second")
         self.total_charge    = self.Parameter("Total charge (mC)")
         self.avg_current     = self.Parameter("Avg current (mA)")
         self.file_name       = self.Parameter("History file")
@@ -217,11 +222,12 @@ class TerminalUI:
 
         while True:
             if not first_run:
-                sys.stdout.write("\033[F"*13)
+                sys.stdout.write("\033[F"*14)
 
             print("\n ---- AMP-O-METER ---- \033[K")
             print(self.time_elapsed)
             print(self.number_of_ticks)
+            print(self.ticks_per_second)
             print(self.number_of_positive_ticks)
             print(self.number_of_negative_ticks)
             print(self.avg_current)
@@ -234,7 +240,7 @@ class TerminalUI:
 
             first_run = False
             sleep(0.1)
-            print("---------------------------------------------------------------------")
+            # print("---------------------------------------------------------------------")
 
 
 class Controller:
@@ -284,6 +290,9 @@ class Controller:
         GPIO.cleanup()
 
     def reset(self, _):
+        self.reset()
+
+    def reset(self):
         self.counter.reset()
 
         if self.ui_type is not None:
@@ -312,6 +321,7 @@ class Controller:
     def update_gui(self):
         if self.ui_type is not None:
             self.gui.number_of_ticks.set(self.counter.number_of_ticks)
+            self.gui.ticks_per_second.set("{:3.2f}".format(self.counter.ticks_per_second))
             self.gui.number_of_positive_ticks.set(self.counter.number_of_positive_ticks)
             self.gui.number_of_negative_ticks.set(self.counter.number_of_negative_ticks)
             self.gui.total_charge.set("{:7.2f}".format(self.counter.accumulated_charge))
@@ -338,13 +348,17 @@ class Controller:
         GPIO.add_event_detect(self.interrupt_pin, GPIO.FALLING, callback=self.probe_callback)
 
     def probe_callback(self, _):
-        polarity = GPIO.input(self.polarity_pin)
-        if polarity:
-            polarity = Tick.RECHARGING
-        else:
-            polarity = Tick.DISCHARGING
+        try:
+            polarity = GPIO.input(self.polarity_pin)
+            if polarity:
+                polarity = Tick.RECHARGING
+            else:
+                polarity = Tick.DISCHARGING
 
-        self.add_tick(polarity)
+            self.add_tick(polarity)
+        except:
+            print("------ ERROR ------------------")
+            print("Polarity pin: {}".format(self.polarity_pin))
 
 
 if __name__ == "__main__":

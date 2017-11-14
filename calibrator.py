@@ -42,6 +42,7 @@ def calculate_lin_reg_coeffs(x, y):
     print('Coefficients: y = {:.3g} * x + {:.3g}'.format(regr.coef_[0], regr.intercept_))
     print("Mean squared error: %.2f" % mean_squared_error(y, y_pred))
     print('Variance score: %.2f' % r2_score(y, y_pred))
+    print()
 
     return {
         "a": regr.coef_[0],
@@ -52,28 +53,22 @@ def calculate_lin_reg_coeffs(x, y):
 
 
 if __name__ == "__main__":
-    int_pins = [21, 20, 16, 12, 25, 24, 23, 18]
-    pol_pins = [26, 19, 13,  6,  5, 22, 27, 17]
+    # int_pins = [21, 20, 16, 12, 25, 24, 23, 18]
+    # pol_pins = [26, 19, 13, 6, 5, 22, 27, 17]
+
+    int_pins = [21, 20]
+    pol_pins = [26, 19]
+    ema_period = 10
+
     sensor_list = []
     saved_tests = []
     test_counter = 0
 
-    for index, int_pin in enumerate(int_pins):
-        sensor_list.append({
-            "id": "s"+str(index),
-            "int_pin": int_pin,
-            "create_csv": "off",
-            "resistor_value": 7.5,
-            "polarity_pin": pol_pins[index],
-            "interrupt_pin": int_pin,
-            "vio_pin": 4,
-            "ma_period": 0
-        })
 
     print("--- CALIBRATOR 2000 ---")
-    duration = input("Type the duration of each test in seconds: ")
+    test_timeout = input("Type timeout duration of each test in seconds: ")
     try:
-        duration = float(duration)
+        test_timeout = float(test_timeout)
     except:
         print("Could you please type a valid number the next time?")
         raise
@@ -81,15 +76,45 @@ if __name__ == "__main__":
     number_of_loops = input("How many loops in the sensor? : ")
     try:
         number_of_loops = float(number_of_loops)
+        if number_of_loops == 1:
+            resistor_value = 7.5
+        elif number_of_loops == 2:
+            resistor_value = 2.2
+        elif number_of_loops == 4:
+            resistor_value = 1.0
+        else:
+            raise
+
+        print("Resistor selected: {}".format(resistor_value))
+
     except:
         print("Could you please type a valid number the next time?")
         raise
+
+
+    for index, int_pin in enumerate(int_pins):
+        sensor = {
+            "id": "s"+str(index+1),
+            "int_pin": int_pin,
+            "create_csv": "off",
+            "resistor_value": 7.5,
+            "polarity_pin": pol_pins[index],
+            "interrupt_pin": int_pin,
+            "vio_pin": 4,
+            "ma_period": ema_period
+        }
+        sensor["controller"] = create_controller(sensor)
+
+        sensor_list.append(sensor)
+
+
+
 
     while True: # test loop: does all measurements
         print("\n----- New test ----------------------------------------------------------")
         print(" -- Type the real current value to begin a test")
         print(" -- Type F to finish tests and calculate calibration parameters")
-        choice = input("Value or F: ")
+        choice = input("F or value: ")
 
         try:
             real_current = float(choice)
@@ -104,32 +129,47 @@ if __name__ == "__main__":
                 break
 
         for sensor in sensor_list:
-            sensor["controller"] = create_controller(sensor)
+            sensor["controller"].reset()
 
         start = time()
         elapsed = 0
-        while duration - elapsed > 0:
+        done = False
+        print("\n"*len(sensor_list))
+        while not done:
 
             sleep(0.1)
             elapsed = time() - start
+            done = True
 
-            sys.stdout.write('\r')
-            # the exact output you're looking for:
-            sys.stdout.write("[%-20s] %d%%" % ('=' * int(elapsed / duration * 20), elapsed / duration * 100))
+            sys.stdout.write("\033[F"*len(sensor_list))
+            for sensor in sensor_list:
+                # the exact output you're looking for:
+                elapsed_ticks = len(sensor["controller"].counter.ticks)
+                done = done and (elapsed_ticks >= ema_period)
+
+                sys.stdout.write("Sensor %s: [%-20s] %d%%\033[K\n" % (sensor["id"], '=' * min(int(elapsed_ticks / ema_period * 20), 20), min((elapsed_ticks / ema_period * 100), 100)))
+
             sys.stdout.flush()
 
+            if time()-start > test_timeout:
+                print(" --- Test timed out\n")
+                break
+
+        duration = time() - start
+        print()
+
+        # Time for the results!
         for sensor in sensor_list:
-            sensor["controller"].clean_gpio()
             sensor_id = sensor["id"]
             ticks_per_second = sensor["controller"].counter.ticks_per_second
-            del sensor["controller"]
 
+            test_data["duration"] = duration
             test_data[sensor_id] = ticks_per_second
-            print("   Sensor {}: {} ticks/second".format(sensor_id, ticks_per_second))
+            print("   Sensor {}: {:.3f} ticks/second".format(sensor_id, ticks_per_second))
         print("")
 
         print(" -- Type again the real current value to begin a test")
-        value = input("Value or F: ")
+        value = input("Value: ")
         test_data["real_current"] = (test_data["real_current"] + float(value))/2
         print(" -- Value for the real_current stored: {}".format(test_data["real_current"]))
 
@@ -152,6 +192,8 @@ if __name__ == "__main__":
     # y = f(x) -> y = a*x + b
     number_of_tests = len(saved_tests)
     for sensor in sensor_list:
+        del sensor["controller"]
+
         y = []
         x = []
 
@@ -172,7 +214,7 @@ if __name__ == "__main__":
             file_name += ".json"
             with open(file_name, 'w') as json_file:
                 all_data = {
-                    "test_duration_seconds": duration,
+                    "test_timeout": test_timeout,
                     "number_of_loops": number_of_loops,
                     "sensor_list": sensor_list,
                     "saved_tests": saved_tests
@@ -188,3 +230,4 @@ if __name__ == "__main__":
             print("Invalid option, please choose another")
 
     print("\n----- Calibration finished. Bye bye! --------------------------------------\n\n")
+    GPIO.cleanup()
