@@ -93,8 +93,11 @@ if __name__ == "__main__":
 
 
     for index, int_pin in enumerate(int_pins):
+        id = input("Type the name of the sensor {} on pin {}: ".format(index, int_pin))
+
         sensor = {
-            "id": "s"+str(index+1),
+            "id": id,
+            "index": index,
             "int_pin": int_pin,
             "create_csv": "off",
             "resistor_value": 7.5,
@@ -117,6 +120,8 @@ if __name__ == "__main__":
         choice = input("F or value: ")
 
         try:
+            choice = choice.replace(",",".")
+            print("Current selected: {}".format(choice))
             real_current = float(choice)
             test_data = {
                 "id": test_counter,
@@ -127,6 +132,9 @@ if __name__ == "__main__":
             if choice.upper() == "F":
                 print("")
                 break
+            else:
+                print("ERROR! ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
+                raise
 
         for sensor in sensor_list:
             sensor["controller"].reset()
@@ -141,7 +149,7 @@ if __name__ == "__main__":
             elapsed = time() - start
             done = True
 
-            sys.stdout.write("\033[F"*len(sensor_list))
+            sys.stdout.write("\033[F"*(len(sensor_list)+1))
             for sensor in sensor_list:
                 # the exact output you're looking for:
                 elapsed_ticks = len(sensor["controller"].counter.ticks)
@@ -149,6 +157,7 @@ if __name__ == "__main__":
 
                 sys.stdout.write("Sensor %s: [%-20s] %d%%\033[K\n" % (sensor["id"], '=' * min(int(elapsed_ticks / ema_period * 20), 20), min((elapsed_ticks / ema_period * 100), 100)))
 
+            print("Elapsed: {:5.1f} ({:3.0f}%)".format(time()-start, 100*(time()-start)/test_timeout))
             sys.stdout.flush()
 
             if time()-start > test_timeout:
@@ -170,6 +179,7 @@ if __name__ == "__main__":
 
         print(" -- Type again the real current value to begin a test")
         value = input("Value: ")
+        value = value.replace(",", ".")
         test_data["real_current"] = (test_data["real_current"] + float(value))/2
         print(" -- Value for the real_current stored: {}".format(test_data["real_current"]))
 
@@ -211,7 +221,7 @@ if __name__ == "__main__":
 
         if save_data.upper() == 'Y' or save_data == '':
             file_name = input("Please type the name of the file: ")
-            file_name += ".json"
+            file_name = "amp-o-meter/test_results/" + file_name + ".json"
             with open(file_name, 'w') as json_file:
                 all_data = {
                     "test_timeout": test_timeout,
