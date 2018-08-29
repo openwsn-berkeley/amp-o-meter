@@ -25,8 +25,8 @@ Here is the list of the hardware used for the original meter. Some components ca
 
 In order to hook it up with the Raspberry Pi (RPi) you first need to solder a few things:
 
-1. First and foremost: solder the two jumpers (`SJ2` and `SJ3`) on its back so that it switches from 5V to 3.3V
-2. 4-pin female header: solder the header to the pins `VIO`, `INT`, `POL` and `GND` so that the female part is in the same side as the circuit (and opposite to those jumpers). Pins `CLR` and `SHDN` will remain disconnected
+1. First and foremost: solder the two jumpers (`SJ2` and `SJ3`) on its back so that it switches from 5V to 3.3V;
+2. 4-pin female header: solder the header to the pins `VIO`, `INT`, `POL` and `GND` so that the female part is in the same side as the circuit (and opposite to those jumpers). Pins `CLR` and `SHDN` will remain disconnected;
 3. Power cables: solder the two hooks to the power input of the counter and two jumper cables to the power output. Hooks with small cable length are preferable as they need to fit inside the case.
 
 #### 2.5 Choosing the resistor and then changing
@@ -37,8 +37,8 @@ The lower value of the resistor is calculated by dividing 0.05 V (the maximum vo
 
 Once the resistor is calculated, replacing it is quite simple:
 
-1. Desorder (or break) the surface mount resistor in the middle of the board between the two bigger holes.
-2. Solder the new resistor either using the surface mount pads or those two holes.
+1. Desorder (or break) the surface mount resistor in the middle of the board between the two bigger holes;
+2. Solder the new resistor either using the surface mount pads or those two holes;
 3. Change the value via the command line interface (detailed below).
 
 ### 3. Assembly with RPi
